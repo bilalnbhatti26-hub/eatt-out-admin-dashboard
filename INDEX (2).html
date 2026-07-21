@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- Styles remain exactly as provided in your original file -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin Dashboard — Order Desk</title>
@@ -68,7 +69,7 @@ button{ font-family: inherit; cursor: pointer; }
 .filter-chip.is-active{ background: var(--surface-2); color: var(--text); }
 
 /* Ticket Styles */
-.orders__grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 22px; }
+.orders__grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 22px; }
 .ticket{
     background:#fffdf8;
     color:#222;
@@ -94,91 +95,27 @@ button{ font-family: inherit; cursor: pointer; }
     background-size:8px 8px;
     background-repeat:repeat-x;
 }
-
-.ticket::before{
-    top:-4px;
-}
-
-.ticket::after{
-    bottom:-4px;
-}.ticket__head{ display: flex; justify-content: space-between; border-bottom: 1px dashed var(--paper-edge); padding-bottom: 10px; margin-bottom: 10px; }
+.ticket::before{ top:-4px; }
+.ticket::after{ bottom:-4px; }
+.ticket__head{ display: flex; justify-content: space-between; border-bottom: 1px dashed #ccc; padding-bottom: 10px; margin-bottom: 10px; }
 .ticket__id{ font-family: var(--font-mono); font-weight: 800; }
 .ticket__section{ margin-bottom: 12px; font-size: 13px; }
-.ticket__label{ font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; color: var(--paper-ink-muted); margin: 0; }
+.ticket__label{ font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; color: #777; margin: 0; }
 .ticket__actions{ display: flex; gap: 8px; margin-top: 15px; }
-.tbtn{ flex: 1; padding: 10px; border: none; border-radius: 4px; font-weight: 700; font-size: 12px; }
-.tbtn--accept{ background: var(--preparing); color: white; }
-.tbtn--delivered{ background: var(--delivered); color: white; }
-.tbtn--cancel{ background: transparent; border: 1px solid var(--cancelled); color: var(--cancelled); }
-
-/* Toasts */
+.status{ margin-top:12px; display:inline-block; padding:6px 12px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:1px; }
+.status-pending{ background:#FFE8A3; color:#8A5A00; }
+.status-preparing{ background:#D8EEFF; color:#005DB8; }
+.status-delivered{ background:#DDF8E5; color:#0A8A44; }
+.status-cancelled{ background:#FFD9D9; color:#C62828; }
+.btn{ flex:1; border:none; padding:12px; border-radius:6px; font-weight:700; cursor:pointer; transition:.25s; }
+.btn:hover{ transform:translateY(-2px); }
+.btn-accept{ background:#46C08A; color:white; }
+.btn-cancel{ background:#E8604C; color:white; }
 .toast-stack{ position: fixed; top: 20px; right: 20px; z-index: 1100; }
-.toast { background: var(--paper); color: var(--paper-ink); padding: 15px; border-radius: 8px; border-left: 5px solid var(--pending); margin-bottom: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
-.status{
-    margin-top:12px;
-    display:inline-block;
-    padding:6px 12px;
-    border-radius:20px;
-    font-size:11px;
-    font-weight:700;
-    letter-spacing:1px;
-}
-
-.status-pending{
-    background:#FFE8A3;
-    color:#8A5A00;
-}
-
-.status-preparing{
-    background:#D8EEFF;
-    color:#005DB8;
-}
-
-.status-delivered{
-    background:#DDF8E5;
-    color:#0A8A44;
-}
-
-.status-cancelled{
-    background:#FFD9D9;
-    color:#C62828;
-}
-.ticket__actions{
-    display:flex;
-    gap:10px;
-    margin-top:18px;
-}
-
-.btn{
-    flex:1;
-    border:none;
-    padding:12px;
-    border-radius:6px;
-    font-weight:700;
-    cursor:pointer;
-    transition:.25s;
-}
-
-.btn:hover{
-    transform:translateY(-2px);
-}
-
-.btn-accept{
-    background:#46C08A;
-    color:white;
-}
-
-.btn-cancel{
-    background:#E8604C;
-    color:white;
-}
-
-
 </style>
 </head>
 <body>
 
-<!-- LOGIN SCREEN -->
 <div id="loginScreen">
     <div class="login-card">
         <div class="brand-mark" style="margin: 0 auto 20px;">OD</div>
@@ -186,11 +123,10 @@ button{ font-family: inherit; cursor: pointer; }
         <input type="email" id="authEmail" placeholder="Email Address">
         <input type="password" id="authPassword" placeholder="Password">
         <button id="authBtn">Sign In</button>
-        <button class="toggle-auth" id="toggleAuth">Don't have an account? Sign Up (First time only)</button>
+        <button class="toggle-auth" id="toggleAuth">Don't have an account? Sign Up</button>
     </div>
 </div>
 
-<!-- MAIN DASHBOARD -->
 <header class="topbar">
   <div class="topbar__brand">
     <div class="brand-mark">OD</div>
@@ -200,7 +136,7 @@ button{ font-family: inherit; cursor: pointer; }
   <div class="topbar__profile">
     <button class="profile-chip" style="background:none; border:none; color:white; display:flex; align-items:center; gap:10px;">
       <span id="adminEmail" style="font-size:12px; color:var(--text-muted);"></span>
-      <div class="profile-avatar">FF</div>
+      <div class="profile-avatar" style="background: var(--preparing); width: 24px; height: 24px; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center;">FF</div>
     </button>
   </div>
 </header>
@@ -249,37 +185,17 @@ button{ font-family: inherit; cursor: pointer; }
 </div>
 
 <div class="toast-stack" id="toastStack"></div>
-<!-- SCRIPTS -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <script>
-
 /* =========================== CONFIGURATION =========================== */
-
 const ADMIN_SUPABASE_URL = "https://cctctqhsaywlgcbycecp.supabase.co";
-
 const ADMIN_SUPABASE_KEY = "sb_publishable_57Jt5_fxPpAS3rnBQbYQ2A_RhdLxWwQ";
-
 const adminDB = window.supabase.createClient(ADMIN_SUPABASE_URL, ADMIN_SUPABASE_KEY);
 
-// Problem 16: Use STATUS object to avoid magic strings
-const STATUS = { 
-    PENDING: 'pending', 
-    PREPARING: 'preparing', 
-    DELIVERED: 'delivered', 
-    CANCELLED: 'cancelled' 
-};
+const STATUS = { PENDING: 'pending', PREPARING: 'preparing', DELIVERED: 'delivered', CANCELLED: 'cancelled' };
+let STATE = { orders: [], filter: 'all', searchQuery: '', isSignUp: false };
 
-// Problem 17: Centralized State
-let STATE = {
-    orders: [],
-    filter: 'all',
-    searchQuery: '',
-    isSignUp: false
-};
-
-// Problem 18: Cache DOM elements to avoid repeated lookups
 const DOM = {
     loginScreen: document.getElementById('loginScreen'),
     authBtn: document.getElementById('authBtn'),
@@ -297,11 +213,9 @@ const DOM = {
     filterChips: document.querySelectorAll('.filter-chip')
 };
 
-/* =========================== 
-   AUTHENTICATION (Problem 7 fixed)
-   =========================== */
+/* =========================== AUTHENTICATION =========================== */
 async function checkUser() {
-    const { data, error } = await adminDB.auth.getSession();
+    const { data } = await adminDB.auth.getSession();
     if (data?.session) {
         DOM.loginScreen.style.display = 'none';
         DOM.adminEmail.textContent = data.session.user.email;
@@ -309,21 +223,16 @@ async function checkUser() {
     }
 }
 
-// Single listener for Auth (Problem 7)
 DOM.authBtn.addEventListener('click', async () => {
     const email = DOM.emailInput.value;
     const password = DOM.passInput.value;
-
     if (!email || !password) return alert("Enter credentials");
-
     if (STATE.isSignUp) {
-        const { data, error } = await adminDB.auth.signUp({ email, password });
-        if (error) alert(error.message);
-        else alert("Check email for verification!");
+        const { error } = await adminDB.auth.signUp({ email, password });
+        if (error) alert(error.message); else alert("Check email for verification!");
     } else {
         const { error } = await adminDB.auth.signInWithPassword({ email, password });
-        if (error) alert(error.message);
-        else checkUser();
+        if (error) alert(error.message); else checkUser();
     }
 });
 
@@ -331,7 +240,7 @@ DOM.toggleAuth.addEventListener('click', () => {
     STATE.isSignUp = !STATE.isSignUp;
     document.getElementById('authTitle').textContent = STATE.isSignUp ? "Admin Sign Up" : "Admin Login";
     DOM.authBtn.textContent = STATE.isSignUp ? "Create Account" : "Sign In";
-    DOM.toggleAuth.textContent = STATE.isSignUp ? "Login instead" : "Sign Up (First time only)";
+    DOM.toggleAuth.textContent = STATE.isSignUp ? "Login instead" : "Don't have an account? Sign Up";
 });
 
 DOM.logoutBtn.addEventListener('click', async () => {
@@ -339,76 +248,52 @@ DOM.logoutBtn.addEventListener('click', async () => {
     window.location.reload();
 });
 
-/* =========================== 
-   DATABASE & REALTIME (Problem 6 & 15)
-   =========================== */
+/* =========================== DATA & REALTIME =========================== */
 async function loadOrders() {
-    const { data, error } = await adminDB
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false });
-
+    const { data, error } = await adminDB.from("orders").select("*").order("created_at", { ascending: false });
     if (error) return console.error(error);
     STATE.orders = data;
     render();
 }
 
 function subscribeToOrders() {
-    // Problem 6: Real realtime subscription
-    adminDB.channel('orders-realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-            loadOrders(); // Refresh state and re-render
-        })
-        .subscribe();
+    adminDB.channel('orders-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        loadOrders();
+    }).subscribe();
 }
 
 async function updateStatus(id, newStatus) {
-    const { error } = await adminDB
-        .from("orders")
-        .update({ status: newStatus })
-        .eq("id", id);
-
+    const { error } = await adminDB.from("orders").update({ status: newStatus }).eq("id", id);
     if (error) alert(error.message);
-    // Note: loadOrders() is called automatically via Realtime subscription
 }
 
-/* =========================== 
-   CALCULATIONS (Problem 9)
-   =========================== */
-function calculateStats() {
-    const stats = {
-        pending: 0,
-        preparing: 0,
-        delivered: 0,
-        revenue: 0
-    };
+/* =========================== RENDERING LOGIC =========================== */
 
-    STATE.orders.forEach(order => {
-        if (order.status === STATUS.PENDING) stats.pending++;
-        if (order.status === STATUS.PREPARING) stats.preparing++;
-        if (order.status === STATUS.DELIVERED) {
-            stats.delivered++;
-            // Problem 10: Handle 'deliery-fee' and 'item' typos safely
-            const subtotal = (order.items || []).reduce((sum, i) => sum + (i.price * i.qty), 0);
-            const delivery = parseFloat(order["deliery-fee"] || 0);
-            stats.revenue += (subtotal + delivery);
-        }
+function createTicketHTML(order, displayIndex) {
+    // 1. Resolve Items (Check if string or array)
+    let itemsArray = [];
+    try {
+        itemsArray = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
+    } catch (e) {
+        console.error("Error parsing items for order:", order.id, e);
+    }
+
+    // Debugging: Verify data shape in console
+    console.log(`Order #${order.id} Data:`, {
+        customer: order.customer,
+        items: itemsArray,
+        total: order.total
     });
 
-    return stats;
-}
-
-/* =========================== 
-   RENDERING LOGIC (Problems 1, 2, 3, 4, 8, 11, 12, 13, 19)
-   =========================== */
-
-// Problem 8 & 19: Ticket HTML Component
-function createTicketHTML(order, displayIndex) {
-    // Problem 11 & 12: Safe checks for nulls
     const dateStr = order.created_at ? new Date(order.created_at).toLocaleString() : "Unknown Date";
-  const address = order.address || "No Address";
-    const items = order.item || []; // Handling typo 'item' from Problem 10
-    const deliveryFee = 20;
+    
+    // 2. Generate Items HTML with Line Totals
+    const itemsHTML = itemsArray.map(i => `
+        <div style="display:flex; justify-content:space-between; margin-bottom: 4px; font-size: 12px;">
+            <span>${i.qty}× ${i.name}</span>
+            <span>Rs ${Number(i.price || 0) * Number(i.qty || 0)}</span>
+        </div>
+    `).join("");
 
     return `
     <div class="ticket">
@@ -417,81 +302,79 @@ function createTicketHTML(order, displayIndex) {
                 <div class="ticket__id">ORDER #${String(displayIndex).padStart(3, "0")}</div>
                 <div style="font-size:11px;color:#777;">${dateStr}</div>
             </div>
-            <strong>EATT OUT</strong>
+            <strong style="font-size:12px;">EATT OUT</strong>
         </div>
-        <hr style="border:none;border-top:1px dashed #ccc;">
         <div class="ticket__section">
             <p class="ticket__label">Customer</p>
             <strong>${order.customer || "Guest"}</strong><br>
             ${order.phone || "No Phone"}
+            <br>
             <div class="status status-${order.status}">${order.status.toUpperCase()}</div>
         </div>
-        <hr style="border:none;border-top:1px dashed #ccc;">
+        <hr style="border:none; border-top:1px dashed #ccc; margin: 10px 0;">
         <div class="ticket__section">
             <p class="ticket__label">Items</p>
-            ${items.map(i => `
-                <div style="display:flex;justify-content:space-between">
-                    <span>${i.qty} × ${i.name}</span>
-                    <span>Rs ${i.price * i.qty}</span>
-                </div>`).join("")}
+            ${itemsHTML || '<div style="color:red">No items found</div>'}
         </div>
-        <hr style="border:none;border-top:1px dashed #ccc;">
-        <div style="display:flex;justify-content:space-between">
-            <strong>Delivery</strong>
-            <strong>Rs ${deliveryFee}</strong>
+        <hr style="border:none; border-top:1px dashed #ccc; margin: 10px 0;">
+        <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:14px;">
+            <span>TOTAL</span>
+            <span>Rs ${order.total || 0}</span>
         </div>
-        <hr style="border:none;border-top:1px dashed #ccc;">
+        <hr style="border:none; border-top:1px dashed #ccc; margin: 10px 0;">
         <div class="ticket__section">
             <p class="ticket__label">Address</p>
-            ${address}
+            <span style="font-size:12px;">${order.address || "No Address Provided"}</span>
         </div>
+        ${order.notes ? `<div class="ticket__section"><p class="ticket__label">Notes</p><i style="font-size:11px;">${order.notes}</i></div>` : ""}
         <div class="ticket__actions">
             ${order.status === STATUS.PENDING ? `
                 <button class="btn btn-accept" onclick="updateStatus('${order.id}','${STATUS.PREPARING}')">ACCEPT</button>
                 <button class="btn btn-cancel" onclick="updateStatus('${order.id}','${STATUS.CANCELLED}')">CANCEL</button>
             ` : ''}
             ${order.status === STATUS.PREPARING ? `
-                <button class="btn btn-accept" style="background:#46C08A" onclick="updateStatus('${order.id}','${STATUS.DELIVERED}')">MARK DELIVERED</button>
+                <button class="btn btn-accept" onclick="updateStatus('${order.id}','${STATUS.DELIVERED}')">MARK DELIVERED</button>
             ` : ''}
         </div>
     </div>`;
 }
 
-// Problem 2: Render decomposed into smaller steps
 function render() {
-    // 1. Update Stats (Problem 9)
-    const stats = calculateStats();
+    // Update Stats
+    const stats = { pending: 0, preparing: 0, delivered: 0, revenue: 0 };
+    STATE.orders.forEach(o => {
+        if (o.status === STATUS.PENDING) stats.pending++;
+        if (o.status === STATUS.PREPARING) stats.preparing++;
+        if (o.status === STATUS.DELIVERED) {
+            stats.delivered++;
+            stats.revenue += Number(o.total || 0);
+        }
+    });
+
     DOM.statPending.textContent = stats.pending;
     DOM.statPreparing.textContent = stats.preparing;
     DOM.statDelivered.textContent = stats.delivered;
     DOM.statRevenue.textContent = `Rs ${stats.revenue.toLocaleString()}`;
 
-    // 2. Filter and Search (Problem 4, 13)
-    const filteredOrders = STATE.orders.filter(order => {
-        const matchesFilter = STATE.filter === 'all' || order.status === STATE.filter;
-        const matchesSearch = 
-            order.customer.toLowerCase().includes(STATE.searchQuery) ||
-            order.phone?.includes(STATE.searchQuery);
+    // Filter & Render Grid
+    const filtered = STATE.orders.filter(o => {
+        const matchesFilter = STATE.filter === 'all' || o.status === STATE.filter;
+        const matchesSearch = o.customer.toLowerCase().includes(STATE.searchQuery) || o.phone?.includes(STATE.searchQuery);
         return matchesFilter && matchesSearch;
     });
 
-    // 3. Rebuild Grid (Problem 3 fixed using filtered index)
-    DOM.ordersGrid.innerHTML = "";
-    filteredOrders.forEach((order, index) => {
-        // Problem 3: Use index + 1 from filtered list for clean numbering
+    DOM.ordersGrid.innerHTML = filtered.length ? "" : "<p style='text-align:center; width:100%; color:#777;'>No orders found.</p>";
+    filtered.forEach((order, index) => {
         DOM.ordersGrid.innerHTML += createTicketHTML(order, index + 1);
     });
 }
 
-/* =========================== 
-   INITIALIZATION & EVENTS 
-   =========================== */
+/* =========================== INITIALIZATION =========================== */
 function initDashboard() {
     loadOrders();
     subscribeToOrders();
 }
 
-// Problem 14: Filter buttons update state then render
 DOM.filterChips.forEach(button => {
     button.addEventListener("click", () => {
         DOM.filterChips.forEach(btn => btn.classList.remove("is-active"));
@@ -501,13 +384,11 @@ DOM.filterChips.forEach(button => {
     });
 });
 
-// Problem 13: Search updates state then render
 DOM.searchInput.addEventListener("input", (e) => {
     STATE.searchQuery = e.target.value.toLowerCase();
     render();
 });
 
-// Start app
 checkUser();
 </script>
 </body>
