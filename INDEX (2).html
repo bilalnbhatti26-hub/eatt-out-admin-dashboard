@@ -254,262 +254,280 @@ button{ font-family: inherit; cursor: pointer; }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
+/* =========================================================
+   ORDER DESK — Core Logic
+   Matches Supabase Schema: id, customer, phone, address, notes, items, total, status, created_at
+   ========================================================= */
 
-/* =========================== CONFIGURATION =========================== */
-
-const ADMIN_SUPABASE_URL = "https://cctctqhsaywlgcbycecp.supabase.co";
-
-const ADMIN_SUPABASE_KEY = "sb_publishable_57Jt5_fxPpAS3rnBQbYQ2A_RhdLxWwQ";
-
-const adminDB = window.supabase.createClient(ADMIN_SUPABASE_URL, ADMIN_SUPABASE_KEY);
-
-// Problem 16: Use STATUS object to avoid magic strings
-const STATUS = { 
-    PENDING: 'pending', 
-    PREPARING: 'preparing', 
-    DELIVERED: 'delivered', 
-    CANCELLED: 'cancelled' 
+const STATUS = {
+  PENDING: 'pending',
+  PREPARING: 'preparing',
+  DELIVERED: 'delivered',
+  CANCELLED: 'cancelled',
 };
 
-// Problem 17: Centralized State
-let STATE = {
-    orders: [],
-    filter: 'all',
-    searchQuery: '',
-    isSignUp: false
+const STATUS_LABEL = {
+  [STATUS.PENDING]: 'Pending',
+  [STATUS.PREPARING]: 'Preparing',
+  [STATUS.DELIVERED]: 'Delivered',
+  [STATUS.CANCELLED]: 'Cancelled',
 };
 
-// Problem 18: Cache DOM elements to avoid repeated lookups
-const DOM = {
-    loginScreen: document.getElementById('loginScreen'),
-    authBtn: document.getElementById('authBtn'),
-    toggleAuth: document.getElementById('toggleAuth'),
-    emailInput: document.getElementById('authEmail'),
-    passInput: document.getElementById('authPassword'),
-    adminEmail: document.getElementById('adminEmail'),
-    logoutBtn: document.getElementById('logoutBtn'),
-    ordersGrid: document.getElementById('ordersGrid'),
-    searchInput: document.getElementById('searchInput'),
-    statPending: document.getElementById('statPending'),
-    statPreparing: document.getElementById('statPreparing'),
-    statDelivered: document.getElementById('statDelivered'),
-    statRevenue: document.getElementById('statRevenue'),
-    filterChips: document.querySelectorAll('.filter-chip')
-};
+let ORDERS = [];
+const supabaseUrl = "https://cctctqhsaywlgcbycecp.supabase.co";
+const supabaseKey = "sb_publishable_57Jt5_fxPpAS3rnBQbYQ2A_RhdLxWwQ";
+const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
-/* =========================== 
-   AUTHENTICATION (Problem 7 fixed)
-   =========================== */
-async function checkUser() {
-    const { data, error } = await adminDB.auth.getSession();
-    if (data?.session) {
-        DOM.loginScreen.style.display = 'none';
-        DOM.adminEmail.textContent = data.session.user.email;
-        initDashboard();
-    }
+/* ---------------- HELPERS ---------------- */
+function formatTime(ts) {
+  if (!ts) return "---";
+  return new Date(ts).toLocaleTimeString('en-PK', {
+    hour: 'numeric',
+    minute: '2-digit',
+    day: 'short',
+    month: 'short'
+  });
 }
 
-// Single listener for Auth (Problem 7)
-DOM.authBtn.addEventListener('click', async () => {
-    const email = DOM.emailInput.value;
-    const password = DOM.passInput.value;
+function formatMoney(n) {
+  return 'Rs ' + (n || 0).toLocaleString('en-PK');
+}
 
-    if (!email || !password) return alert("Enter credentials");
+function waitMinutesSeconds(order) {
+  const end = (order.status === STATUS.DELIVERED || order.status === STATUS.CANCELLED)
+    ? (order.finishedAt || Date.now())
+    : Date.now();
+  const ms = Math.max(0, end - order.createdAt);
+  const totalSec = Math.floor(ms / 1000);
+  return {
+    m: Math.floor(totalSec / 60),
+    s: totalSec % 60,
+    totalMin: totalSec / 60
+  };
+}
 
-    if (STATE.isSignUp) {
-        const { data, error } = await adminDB.auth.signUp({ email, password });
-        if (error) alert(error.message);
-        else alert("Check email for verification!");
-    } else {
-        const { error } = await adminDB.auth.signInWithPassword({ email, password });
-        if (error) alert(error.message);
-        else checkUser();
-    }
-});
-
-DOM.toggleAuth.addEventListener('click', () => {
-    STATE.isSignUp = !STATE.isSignUp;
-    document.getElementById('authTitle').textContent = STATE.isSignUp ? "Admin Sign Up" : "Admin Login";
-    DOM.authBtn.textContent = STATE.isSignUp ? "Create Account" : "Sign In";
-    DOM.toggleAuth.textContent = STATE.isSignUp ? "Login instead" : "Sign Up (First time only)";
-});
-
-DOM.logoutBtn.addEventListener('click', async () => {
-    await adminDB.auth.signOut();
-    window.location.reload();
-});
-
-/* =========================== 
-   DATABASE & REALTIME (Problem 6 & 15)
-   =========================== */
+/* ---------------- DATA LOADING ---------------- */
 async function loadOrders() {
-    const { data, error } = await adminDB
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false });
+  const { data, error } = await supabaseClient
+    .from("orders")
+    .select("*")
+    .order("created_at", { ascending: false });
 
-    if (error) return console.error(error);
-    STATE.orders = data;
-    render();
+  if (error) {
+    console.error("Supabase Load Error:", error);
+    return;
+  }
+
+  // MAPPING SUPABASE DATA TO DASHBOARD UI
+  ORDERS = data.map(order => ({
+    id: order.id,
+    customer: order.customer,
+    phone: order.phone,
+    items: order.items || [], // Matches the JSON array from website
+    total: order.total,       // Matches the total column
+    address: order.address,   // Matches the string column
+    notes: order.notes,
+    status: order.status,
+    createdAt: new Date(order.created_at).getTime()
+  }));
+
+  render();
 }
 
-function subscribeToOrders() {
-    // Problem 6: Real realtime subscription
-    adminDB.channel('orders-realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-            loadOrders(); // Refresh state and re-render
-        })
-        .subscribe();
+/* ---------------- ACTIONS ---------------- */
+async function setStatus(id, status) {
+  const order = ORDERS.find(o => o.id == id);
+  if (!order) return;
+
+  const { error } = await supabaseClient
+    .from("orders")
+    .update({ status: status })
+    .eq("id", id);
+
+  if (error) {
+    alert("Status update failed: " + error.message);
+    return;
+  }
+
+  order.status = status;
+  if (status === STATUS.DELIVERED || status === STATUS.CANCELLED) {
+    order.finishedAt = Date.now();
+  }
+
+  if (typeof closeSheet === 'function') closeSheet();
+  render();
 }
 
-async function updateStatus(id, newStatus) {
-    const { error } = await adminDB
-        .from("orders")
-        .update({ status: newStatus })
-        .eq("id", id);
-
-    if (error) alert(error.message);
-    // Note: loadOrders() is called automatically via Realtime subscription
+/* ---------------- REALTIME ---------------- */
+function initRealtime() {
+  supabaseClient
+    .channel('db-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+      if (payload.eventType === 'INSERT') {
+        if (typeof playChime === 'function') playChime();
+      }
+      loadOrders(); // Refresh all data on any change
+    })
+    .subscribe();
 }
 
-/* =========================== 
-   CALCULATIONS (Problem 9)
-   =========================== */
-function calculateStats() {
-    const stats = {
-        pending: 0,
-        preparing: 0,
-        delivered: 0,
-        revenue: 0
-    };
+/* ---------------- INITIALIZE ---------------- */
+loadOrders();
+initRealtime();
 
-    STATE.orders.forEach(order => {
-        if (order.status === STATUS.PENDING) stats.pending++;
-        if (order.status === STATUS.PREPARING) stats.preparing++;
-        if (order.status === STATUS.DELIVERED) {
-            stats.delivered++;
-            // Problem 10: Handle 'deliery-fee' and 'item' typos safely
-            const subtotal = (order.item || []).reduce((sum, i) => sum + (i.price * i.qty), 0);
-            const delivery = parseFloat(order["deliery-fee"] || 0);
-            stats.revenue += (subtotal + delivery);
-        }
-    });
 
-    return stats;
-}
+/* =========================================================
+   DASHBOARD RENDERING (UI Logic)
+   ========================================================= */
 
-/* =========================== 
-   RENDERING LOGIC (Problems 1, 2, 3, 4, 8, 11, 12, 13, 19)
-   =========================== */
+(function () {
+  'use strict';
 
-// Problem 8 & 19: Ticket HTML Component
-function createTicketHTML(order, displayIndex) {
-    // Problem 11 & 12: Safe checks for nulls
-    const dateStr = order.created_at ? new Date(order.created_at).toLocaleString() : "Unknown Date";
-    const line1 = order.address?.line1 || "No Address";
-    const area = order.address?.area || "";
-    const items = order.item || []; // Handling typo 'item' from Problem 10
-    const deliveryFee = order["deliery-fee"] || 0;
+  const grid = document.getElementById('ordersGrid');
+  const emptyMsg = document.getElementById('ordersEmpty');
+  const searchInput = document.getElementById('searchInput');
+  const filtersEl = document.getElementById('filters');
+  
+  let state = {
+    filter: 'all',
+    query: '',
+  };
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function renderStats() {
+    const pending = ORDERS.filter(o => o.status === STATUS.PENDING).length;
+    const preparing = ORDERS.filter(o => o.status === STATUS.PREPARING).length;
+    const delivered = ORDERS.filter(o => o.status === STATUS.DELIVERED).length;
+    const revenue = ORDERS
+      .filter(o => o.status === STATUS.DELIVERED)
+      .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+
+    document.getElementById('statPending').textContent = pending;
+    document.getElementById('statPreparing').textContent = preparing;
+    document.getElementById('statDelivered').textContent = delivered;
+    document.getElementById('statRevenue').textContent = formatMoney(revenue);
+  }
+
+  function ticketMarkup(order, opts = {}) {
+    const { m, s, totalMin } = waitMinutesSeconds(order);
+    const isActive = order.status === STATUS.PENDING || order.status === STATUS.PREPARING;
+    
+    // Build items list
+    const itemsHtml = order.items.map(it => `
+      <li><span class="qty">${it.qty}×</span> ${escapeHtml(it.name)}</li>
+    `).join('');
 
     return `
-    <div class="ticket">
+      <article class="ticket" data-status="${order.status}" data-id="${order.id}" style="--tilt:${opts.tilt || 0}deg">
+        <div class="ticket__stripe"></div>
         <div class="ticket__head">
-            <div>
-                <div class="ticket__id">ORDER #${String(displayIndex).padStart(3, "0")}</div>
-                <div style="font-size:11px;color:#777;">${dateStr}</div>
-            </div>
-            <strong>EATT OUT</strong>
+          <span class="ticket__id">#${String(order.id).padStart(3, '0')}</span>
+          ${isActive ? `
+            <div class="ticket__timer">
+              <span class="dot"></span>
+              <span class="ticket__timer-text">Waiting ${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}</span>
+            </div>` : `<span class="ticket__time">${formatTime(order.createdAt)}</span>`}
+          <span class="ticket__status">${STATUS_LABEL[order.status]}</span>
         </div>
-        <hr style="border:none;border-top:1px dashed #ccc;">
+
         <div class="ticket__section">
-            <p class="ticket__label">Customer</p>
-            <strong>${order.customer || "Guest"}</strong><br>
-            ${order.phone || "No Phone"}
-            <div class="status status-${order.status}">${order.status.toUpperCase()}</div>
+          <p class="ticket__label">Customer</p>
+          <p class="ticket__customer">${escapeHtml(order.customer)}</p>
+          <p class="ticket__phone">${escapeHtml(order.phone)}</p>
         </div>
-        <hr style="border:none;border-top:1px dashed #ccc;">
+
         <div class="ticket__section">
-            <p class="ticket__label">Items</p>
-            ${items.map(i => `
-                <div style="display:flex;justify-content:space-between">
-                    <span>${i.qty} × ${i.name}</span>
-                    <span>Rs ${i.price * i.qty}</span>
-                </div>`).join("")}
+          <p class="ticket__label">Items</p>
+          <ul class="ticket__items">${itemsHtml}</ul>
         </div>
-        <hr style="border:none;border-top:1px dashed #ccc;">
-        <div style="display:flex;justify-content:space-between">
-            <strong>Delivery</strong>
-            <strong>Rs ${deliveryFee}</strong>
-        </div>
-        <hr style="border:none;border-top:1px dashed #ccc;">
+
         <div class="ticket__section">
-            <p class="ticket__label">Address</p>
-            ${line1}<br>${area}
+          <div class="ticket__totals">
+            <div class="ticket__totals-row is-total"><span>Total</span><span>${formatMoney(order.total)}</span></div>
+          </div>
         </div>
+
+        <div class="ticket__section">
+          <p class="ticket__label">Address</p>
+          <p class="ticket__address">${escapeHtml(order.address)}</p>
+        </div>
+
+        ${order.notes ? `
+        <div class="ticket__section">
+          <p class="ticket__label">Notes</p>
+          <p class="ticket__note">${escapeHtml(order.notes)}</p>
+        </div>` : ''}
+
         <div class="ticket__actions">
-            ${order.status === STATUS.PENDING ? `
-                <button class="btn btn-accept" onclick="updateStatus('${order.id}','${STATUS.PREPARING}')">ACCEPT</button>
-                <button class="btn btn-cancel" onclick="updateStatus('${order.id}','${STATUS.CANCELLED}')">CANCEL</button>
-            ` : ''}
-            ${order.status === STATUS.PREPARING ? `
-                <button class="btn btn-accept" style="background:#46C08A" onclick="updateStatus('${order.id}','${STATUS.DELIVERED}')">MARK DELIVERED</button>
-            ` : ''}
+           ${order.status === STATUS.PENDING ? `
+            <button class="tbtn tbtn--accept" data-action="accept" data-id="${order.id}">Accept</button>
+            <button class="tbtn tbtn--cancel" data-action="cancel" data-id="${order.id}">Cancel</button>
+          ` : ''}
+          ${order.status === STATUS.PREPARING ? `
+            <button class="tbtn tbtn--delivered" data-action="deliver" data-id="${order.id}">Mark Delivered</button>
+            <button class="tbtn tbtn--cancel" data-action="cancel" data-id="${order.id}">Cancel</button>
+          ` : ''}
+          ${order.status === STATUS.DELIVERED ? `<button class="tbtn" disabled>COMPLETED</button>` : ''}
         </div>
-    </div>`;
-}
+      </article>
+    `;
+  }
 
-// Problem 2: Render decomposed into smaller steps
-function render() {
-    // 1. Update Stats (Problem 9)
-    const stats = calculateStats();
-    DOM.statPending.textContent = stats.pending;
-    DOM.statPreparing.textContent = stats.preparing;
-    DOM.statDelivered.textContent = stats.delivered;
-    DOM.statRevenue.textContent = `Rs ${stats.revenue.toLocaleString()}`;
-
-    // 2. Filter and Search (Problem 4, 13)
-    const filteredOrders = STATE.orders.filter(order => {
-        const matchesFilter = STATE.filter === 'all' || order.status === STATE.filter;
-        const matchesSearch = 
-            order.customer.toLowerCase().includes(STATE.searchQuery) ||
-            order.phone?.includes(STATE.searchQuery);
+  window.render = function render() {
+    renderStats();
+    const list = ORDERS.filter(o => {
+        const matchesFilter = state.filter === 'all' ? true : o.status === state.filter;
+        const q = state.query.toLowerCase();
+        const matchesSearch = o.customer.toLowerCase().includes(q) || o.phone.includes(q) || String(o.id).includes(q);
         return matchesFilter && matchesSearch;
     });
 
-    // 3. Rebuild Grid (Problem 3 fixed using filtered index)
-    DOM.ordersGrid.innerHTML = "";
-    filteredOrders.forEach((order, index) => {
-        // Problem 3: Use index + 1 from filtered list for clean numbering
-        DOM.ordersGrid.innerHTML += createTicketHTML(order, index + 1);
-    });
-}
+    emptyMsg.hidden = list.length > 0;
+    grid.innerHTML = list.map((o, i) => ticketMarkup(o, { tilt: (i % 2 === 0 ? 0.5 : -0.5) })).join('');
+  }
 
-/* =========================== 
-   INITIALIZATION & EVENTS 
-   =========================== */
-function initDashboard() {
-    loadOrders();
-    subscribeToOrders();
-}
+  /* ---------------- INTERACTIVITY ---------------- */
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const action = btn.dataset.action;
+    if (action === 'accept') setStatus(id, STATUS.PREPARING);
+    if (action === 'deliver') setStatus(id, STATUS.DELIVERED);
+    if (action === 'cancel') setStatus(id, STATUS.CANCELLED);
+  });
 
-// Problem 14: Filter buttons update state then render
-DOM.filterChips.forEach(button => {
-    button.addEventListener("click", () => {
-        DOM.filterChips.forEach(btn => btn.classList.remove("is-active"));
-        button.classList.add("is-active");
-        STATE.filter = button.dataset.filter;
-        render();
-    });
-});
-
-// Problem 13: Search updates state then render
-DOM.searchInput.addEventListener("input", (e) => {
-    STATE.searchQuery = e.target.value.toLowerCase();
+  searchInput.addEventListener('input', (e) => {
+    state.query = e.target.value;
     render();
-});
+  });
 
-// Start app
-checkUser();
+  filtersEl.addEventListener('click', (e) => {
+    const chip = e.target.closest('.filter-chip');
+    if (!chip) return;
+    filtersEl.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('is-active'));
+    chip.classList.add('is-active');
+    state.filter = chip.dataset.filter;
+    render();
+  });
+
+  setInterval(() => {
+    // Basic timer refresh without full re-render
+    document.querySelectorAll('.ticket__timer-text').forEach(el => {
+        const id = el.closest('.ticket').dataset.id;
+        const order = ORDERS.find(o => o.id == id);
+        if (order) {
+            const { m, s } = waitMinutesSeconds(order);
+            el.textContent = `Waiting ${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+    });
+  }, 1000);
+
+})();
 </script>
 </body>
 </html>
